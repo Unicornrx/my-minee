@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Sayang - Word Cloud Heart</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #030102;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            user-select: none;
+        }
+
+        .glow-bg {
+            position: absolute;
+            width: 50vw;
+            height: 50vw;
+            max-width: 500px;
+            max-height: 500px;
+            background: radial-gradient(circle, rgba(220, 20, 60, 0.35) 0%, rgba(139, 0, 30, 0.1) 50%, rgba(0, 0, 0, 0) 75%);
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 2.5s ease-in-out;
+        }
+
+        .glow-bg.show {
+            opacity: 1;
+            animation: pulseGlow 3s ease-in-out infinite;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .center-text {
+            position: relative;
+            z-index: 2;
+            color: #ffffff;
+            font-size: clamp(2rem, 4.2vw, 3.2rem);
+            font-weight: normal;
+            letter-spacing: 1.5px;
+            text-shadow: 
+                0 0 8px rgba(255, 255, 255, 0.95),
+                0 0 20px rgba(255, 80, 120, 0.9),
+                0 0 40px rgba(220, 20, 60, 0.9);
+            cursor: pointer;
+            text-align: center;
+            padding: 8px 16px;
+            
+            opacity: 0;
+            transform: scale(0.6);
+            transition: opacity 2s ease-out, transform 2s ease-out;
+        }
+
+        .center-text.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .center-text.heartbeat {
+            animation: heartbeat 1.4s ease-in-out infinite;
+        }
+
+        .edit-hint {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            z-index: 10;
+            color: rgba(255, 255, 255, 0.25);
+            font-family: sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .edit-hint:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); opacity: 0.85; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            15% { transform: scale(1.06); }
+            30% { transform: scale(1); }
+            45% { transform: scale(1.03); }
+            60% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="glow-bg" id="glowBg"></div>
+    <canvas id="heartCanvas"></canvas>
+    
+    <div class="center-text" id="nameText" title="Klik untuk ganti teks">My Sayang</div>
+    <div class="edit-hint" id="editBtn">Ganti Teks</div>
+
+    <script>
+        const canvas = document.getElementById('heartCanvas');
+        const ctx = canvas.getContext('2d');
+        const nameText = document.getElementById('nameText');
+        const glowBg = document.getElementById('glowBg');
+        const editBtn = document.getElementById('editBtn');
+
+        function changeName() {
+            const newName = prompt("Masukkan teks di tengah:", nameText.innerText);
+            if (newName !== null && newName.trim() !== "") {
+                nameText.innerText = newName.trim();
+            }
+        }
+        nameText.addEventListener('click', changeName);
+        editBtn.addEventListener('click', changeName);
+
+        let width, height;
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const colors = ['#ffffff', '#ffccd5', '#ff8fa3', '#ff4d6d', '#e01e5a', '#ff758f'];
+        const sprites = colors.map(color => {
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = 110;
+            offCanvas.height = 30;
+            const oCtx = offCanvas.getContext('2d');
+            oCtx.font = 'bold 15px Georgia, serif';
+            oCtx.fillStyle = color;
+            oCtx.textAlign = 'center';
+            oCtx.textBaseline = 'middle';
+            oCtx.fillText('I love you', 55, 15);
+            return offCanvas;
+        });
+
+        function isInsideHeart(nx, ny) {
+            const y = -ny * 1.15 + 0.12;
+            const x = nx * 1.15;
+            const a = x * x + y * y - 1;
+            return (a * a * a - x * x * y * y * y) <= 0;
+        }
+
+        const words = [];
+        const gridStepX = 0.068;
+        const gridStepY = 0.042;
+
+        for (let ny = -1.1; ny <= 1.1; ny += gridStepY) {
+            for (let nx = -1.2; nx <= 1.2; nx += gridStepX) {
+                const jx = nx + (Math.random() - 0.5) * (gridStepX * 0.65);
+                const jy = ny + (Math.random() - 0.5) * (gridStepY * 0.65);
+
+                if (isInsideHeart(jx, jy)) {
+                    const distFromCenter = Math.hypot(jx, jy);
+                    words.push({
+                        nx: jx,
+                        ny: jy,
+                        scale: 0.45 + Math.random() * 0.45,
+                        angle: (Math.random() - 0.5) * 0.35,
+                        sprite: sprites[Math.floor(Math.random() * sprites.length)],
+                        maxAlpha: 0.55 + Math.random() * 0.45,
+                        currentAlpha: 0,
+                        // DIPERPELAN & DIJEDA: "I love you" baru mulai keluar setelah 2.2 detik (saat "My Sayang" sudah mapan), lalu menyebar bertahap secara natural
+                        appearDelay: 2.2 + (distFromCenter * 0.8) + Math.random() * 0.6,
+                        twinkleOffset: Math.random() * Math.PI * 2
+                    });
+                }
+            }
+        }
+
+        // TAHAP 1: "My Sayang" muncul pelan duluan
+        setTimeout(() => {
+            nameText.classList.add('show');
+            glowBg.classList.add('show');
+        }, 300);
+
+        setTimeout(() => {
+            nameText.classList.add('heartbeat');
+        }, 2500);
+
+        let time = 0;
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            time += 0.016;
+
+            const beat = 1 + Math.sin(time * 3) * 0.025 + Math.sin(time * 6) * 0.008;
+            const heartRadius = Math.min(width, height) * 0.36 * beat;
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            for (let i = 0; i < words.length; i++) {
+                const w = words[i];
+
+                // TAHAP 2: Kata-kata "I love you" bermunculan secara halus dan mengalir
+                if (time > w.appearDelay && w.currentAlpha < w.maxAlpha) {
+                    w.currentAlpha = Math.min(w.maxAlpha, w.currentAlpha + 0.025); // Kecepatan muncul dibuat lembut
+                }
+
+                if (w.currentAlpha > 0) {
+                    const screenX = centerX + w.nx * heartRadius;
+                    const screenY = centerY + w.ny * heartRadius;
+                    const alpha = w.currentAlpha * (0.8 + 0.2 * Math.sin(time * 2.5 + w.twinkleOffset));
+
+                    ctx.save();
+                    ctx.translate(screenX, screenY);
+                    ctx.rotate(w.angle);
+                    ctx.globalAlpha = alpha;
+                    
+                    const drawW = 110 * w.scale * (heartRadius / 280);
+                    const drawH = 30 * w.scale * (heartRadius / 280);
+                    ctx.drawImage(w.sprite, -drawW / 2, -drawH / 2, drawW, drawH);
+                    ctx.restore();
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
